@@ -112,7 +112,7 @@ public class QuadTreeCompression {
         totalNodes++;
         maxDepth = Math.max(maxDepth, depth);
         
-        if (width <= minBlockSize || height <= minBlockSize || computeError(img, x, y, width, height) <= threshold) {
+        if (width * height <= minBlockSize || computeError(img, x, y, width, height) <= threshold) {
             return new QuadTreeNode(x, y, width, height, averageColor(img, x, y, width, height), true);
         }
     
@@ -157,9 +157,12 @@ public class QuadTreeCompression {
         long rSum = 0, gSum = 0, bSum = 0;
         int count = 0;
 
+        // if (width * height > minBlockSize){
+        //     return 0;
+        // }
         // Hitung rata-rata tiap kanal warna
-        for (int i = x; i < x + width && i < img.getWidth(); i++) {
-            for (int j = y; j < y + height && j < img.getHeight(); j++) {
+        for (int i = x; i < x + width; i++) {
+            for (int j = y; j < y + height; j++) {
                 int color = img.getRGB(i, j);
                 rSum += (color >> 16) & 0xFF;
                 gSum += (color >> 8) & 0xFF;
@@ -177,8 +180,8 @@ public class QuadTreeCompression {
         // Hitung varians tiap kanal warna
         double rVar = 0, gVar = 0, bVar = 0;
 
-        for (int i = x; i < x + width && i < img.getWidth(); i++) {
-            for (int j = y; j < y + height && j < img.getHeight(); j++) {
+        for (int i = x; i < x + width; i++) {
+            for (int j = y; j < y + height; j++) {
                 int color = img.getRGB(i, j);
                 double r = ((color >> 16) & 0xFF) - rMean;
                 double g = ((color >> 8) & 0xFF) - gMean;
