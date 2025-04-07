@@ -65,7 +65,7 @@ public class QuadTreeCompression {
             }
         }
         
-        System.out.print("Pilih metode error (1: Variansi, 2: MAD, 3: Max Pixel Difference, 4: Entropy): ");
+        System.out.print("Pilih metode error (1: Variansi, 2: MAD, 3: Max Pixel Difference, 4: Entropy, 5: SSIM): ");
         method = scanner.nextInt();
         System.out.print("Masukkan threshold: ");
         threshold = scanner.nextDouble();
@@ -91,7 +91,7 @@ public class QuadTreeCompression {
         startTime = System.nanoTime();
         QuadTreeNode root = buildQuadTree(img, 0, 0, img.getWidth(), img.getHeight(), 0);
         long executionTime = System.nanoTime() - startTime;
-
+        
         BufferedImage compressedImage = new BufferedImage(img.getWidth(), img.getHeight(), BufferedImage.TYPE_INT_RGB);
         drawQuadTree(compressedImage, root);
         ImageIO.write(compressedImage, "png", new File(outputPath));
@@ -110,9 +110,10 @@ public class QuadTreeCompression {
 
     private static QuadTreeNode buildQuadTree(BufferedImage img, int x, int y, int width, int height, int depth) {  
         maxDepth = Math.max(maxDepth, depth);
-        if (width * height <= minBlockSize || computeError(img, x, y, width, height) <= threshold) {
+        double err = computeError(img, x, y, width, height);
+        if (width * height <= minBlockSize || err <= threshold) {
             totalNodes++;
-            //System.out.println("TesTes");
+            //System.out.println(err);
             return new QuadTreeNode(x, y, width, height, averageColor(img, x, y, width, height), true);
         }
     
@@ -149,6 +150,7 @@ public class QuadTreeCompression {
             case 2: return computeMAD(img, x, y, width, height);
             case 3: return computeMaxDiff(img, x, y, width, height);
             case 4: return computeEntropy(img, x, y, width, height);
+            case 5: return computeSSIM(img, x, y, width, height);
             default: return computeVariance(img, x, y, width, height);
         }
     }
@@ -333,5 +335,54 @@ public class QuadTreeCompression {
         }
 
         return (rEntro+gEntro+bEntro)/3;
+    }
+
+    private static double computeSSIM(BufferedImage img, int x, int y, int width, int height) {
+        Color avgColor = new Color(averageColor(img, x, y, width, height));
+        int ryMean = avgColor.getRed();
+        int gyMean = avgColor.getGreen();
+        int byMean = avgColor.getBlue();
+        // C = (KL)^2, K = 0.01, K = 0.03
+        double C1 = 6.5025, C2 = 58.5225;
+        int rx = 0, gx = 0, bx = 0;
+        int rxSum = 0, gxSum = 0, bxSum = 0;
+        int count = 0;
+
+        for (int i = x; i < x + width && i < img.getWidth(); i++) {
+            for (int j = y; j < y + height && j < img.getHeight(); j++) {
+                int color = img.getRGB(i, j);
+                rx = (color >> 16) & 0xFF;
+                gx = (color >> 8) & 0xFF;
+                bx = color & 0xFF;
+                rxSum += rx;
+                gxSum += gx;
+                bxSum += bx;
+                count++; 
+            }
+        }
+        
+        if (count == 0) return 0; 
+        double rxMean = (double) rxSum / count;
+        double gxMean = (double) gxSum / count;
+        double bxMean = (double) bxSum / count;
+
+        double rxVar = 0, gxVar = 0, bxVar = 0;
+        for (int i = x; i < x + width; i++) {
+            for (int j = y; j < y + height; j++) {
+                int color = img.getRGB(i, j);
+                double r = ((color >> 16) & 0xFF) - rxMean;
+                double g = ((color >> 8) & 0xFF) - gxMean;
+                double b = (color & 0xFF) - bxMean;
+                rxVar += r * r;
+                gxVar += g * g;
+                bxVar += b * b;
+            }
+        }
+
+        double rSSIM = ((2*rxMean*ryMean+C1)*C2)/((rxMean*rxMean+ryMean*ryMean+C1)*(rxVar+C2));
+        double gSSIM = ((2*gxMean*gyMean+C1)*C2)/((gxMean*gxMean+gyMean*gyMean+C1)*(gxVar+C2));
+        double bSSIM = ((2*bxMean*byMean+C1)*C2)/((bxMean*bxMean+byMean*byMean+C1)*(bxVar+C2));
+
+        return (0.2989*rSSIM+0.5870*gSSIM+0.1140*bSSIM);
     }
 }
