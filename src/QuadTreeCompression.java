@@ -108,11 +108,11 @@ public class QuadTreeCompression {
         System.out.println("Gambar hasil disimpan di: " + outputPath);
     }
 
-    private static QuadTreeNode buildQuadTree(BufferedImage img, int x, int y, int width, int height, int depth) {
-        totalNodes++;
+    private static QuadTreeNode buildQuadTree(BufferedImage img, int x, int y, int width, int height, int depth) {  
         maxDepth = Math.max(maxDepth, depth);
-        
         if (width * height <= minBlockSize || computeError(img, x, y, width, height) <= threshold) {
+            totalNodes++;
+            //System.out.println("TesTes");
             return new QuadTreeNode(x, y, width, height, averageColor(img, x, y, width, height), true);
         }
     
@@ -148,7 +148,7 @@ public class QuadTreeCompression {
             case 1: return computeVariance(img, x, y, width, height);
             case 2: return computeMAD(img, x, y, width, height);
             case 3: return computeMaxDiff(img, x, y, width, height);
-            // case 4: return computeEntropy(img, x, y, width, height);
+            case 4: return computeEntropy(img, x, y, width, height);
             default: return computeVariance(img, x, y, width, height);
         }
     }
@@ -197,7 +197,7 @@ public class QuadTreeCompression {
         bVar /= count;
 
         // Hitung varians RGB gabungan
-        return (rVar + gVar + bVar) / 3;
+        return (rVar + gVar + bVar) / 3.0;
     }
 
     private static double computeMAD(BufferedImage img, int x, int y, int width, int height) {
@@ -230,9 +230,9 @@ public class QuadTreeCompression {
                 double r = ((color >> 16) & 0xFF) - rMean;
                 double g = ((color >> 8) & 0xFF) - gMean;
                 double b = (color & 0xFF) - bMean;
-                madr += r * r;
-                madg += g * g;
-                madb += b * b;
+                madr += Math.abs(r);
+                madg += Math.abs(g);
+                madb += Math.abs(b);
             }
         }
 
@@ -241,7 +241,7 @@ public class QuadTreeCompression {
         madb /= count;
 
         // Hitung varians RGB gabungan
-        return (madr + madg + madb) / 3;    
+        return (madr + madg + madb) / 3.0;    
     }
 
     private static double computeMaxDiff(BufferedImage img, int x, int y, int width, int height) {
@@ -275,10 +275,6 @@ public class QuadTreeCompression {
         return (dR + dG + dB) / 3.0;
     }
 
-    // private static double computeEntropy(BufferedImage img, int x, int y, int size) {
-        
-    // }
-
     private static int averageColor(BufferedImage img, int x, int y, int width, int height) {
         long r = 0, g = 0, b = 0;
         int count = 0;
@@ -299,5 +295,43 @@ public class QuadTreeCompression {
         b /= count;
     
         return (int) ((r << 16) | (g << 8) | b);
+    }
+
+    private static double computeEntropy(BufferedImage img, int x, int y, int width, int height) {
+        int r = 0, g = 0, b = 0, count = 0;
+        int[] rVal = new int[256];
+        int[] gVal = new int[256];
+        int[] bVal = new int[256];
+        double[] rProb = new double[256];
+        double[] gProb = new double[256];
+        double[] bProb = new double[256];
+        double rEntro = 0, gEntro = 0, bEntro = 0;
+
+        for (int i = x; i < x + width && i < img.getWidth(); i++) {
+            for (int j = y; j < y + height && j < img.getHeight(); j++) {
+                int color = img.getRGB(i, j);
+                r = (color >> 16) & 0xFF;
+                g = (color >> 8) & 0xFF;
+                b = color & 0xFF;
+                rVal[r]++;
+                gVal[g]++;
+                bVal[b]++;
+                count++; 
+            }
+        }
+        if (count == 0) return 0;
+        for (int i = 0; i < 256; i++) {
+            rProb[i] = (double) rVal[i]/count;
+            gProb[i] = (double) gVal[i]/count;
+            bProb[i] = (double) bVal[i]/count;
+        }
+
+        for (int i = 0; i < 256; i++) {
+            rEntro -= rProb[i]*(Math.log(rProb[i])/Math.log(2));
+            gEntro -= gProb[i]*(Math.log(gProb[i])/Math.log(2));
+            bEntro -= bProb[i]*(Math.log(bProb[i])/Math.log(2));
+        }
+
+        return (rEntro+gEntro+bEntro)/3;
     }
 }
