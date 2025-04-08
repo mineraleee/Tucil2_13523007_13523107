@@ -3,9 +3,16 @@ import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
-import java.io.ObjectOutputStream;
+import java.util.List;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.LinkedList;
+import java.util.Queue;
 import java.util.Scanner;
 import javax.imageio.ImageIO;
+import javax.imageio.stream.FileImageOutputStream;
+import javax.imageio.stream.ImageOutputStream;
+import java.io.ObjectOutputStream;
 import java.io.Serializable;
 
 class QuadTreeNode implements Serializable{
@@ -31,7 +38,10 @@ public class QuadTreeCompression {
     private static long startTime, thresholdTime =0;
     private static int totalNodes = 0;
     private static int maxDepth = 0;
+    private static BufferedImage currentFrame;
+    private static List<BufferedImage> frames = new ArrayList<>();
     private static double targetCompression;
+    private static boolean isMinBlock;
 
     public static void main(String[] args) throws Exception {
         Scanner scanner = new Scanner(System.in);
@@ -72,25 +82,31 @@ public class QuadTreeCompression {
         File inputFile = new File (imagePath);
         long originalSize = inputFile.length();
         
-        System.out.print("Pilih metode error (1: Variansi, 2: MAD, 3: Max Pixel Difference, 4: Entropy): ");
+        System.out.print("Pilih metode error (1: Variansi, 2: MAD, 3: Max Pixel Difference, 4: Entropy, 5: SSIM): ");
         method = scanner.nextInt();
        
-        System.out.print("Masukkan ukuran blok minimum: ");
-        minBlockSize = scanner.nextInt();
+       
         System.out.print("Masukkan target persentase kompresi (beri nilai 0 jika ingin menonaktifkan): ");
         targetCompression = scanner.nextDouble();
         if (targetCompression == 0){
+            isMinBlock = false;
             System.out.print("Masukkan threshold: ");
             threshold = scanner.nextDouble();
+            System.out.print("Masukkan ukuran blok minimum: ");
+            minBlockSize = scanner.nextInt();
         } else{
+            isMinBlock = true;
             long thresholdStart = System.nanoTime();
             threshold = findBestThreshold (img, originalSize);
             thresholdTime = System.nanoTime() - thresholdStart;
         }
-        System.out.print("Masukkan nama gambar hasil (beserta ekstensinya .jpg/.png): ");
+        System.out.print("Masukkan nama gambar hasil (beserta ekstensinya .jpg/.jpeg./.png): ");
         String outputName = scanner.next();
+        System.out.print("Masukkan nama file GIF hasil (akhiri dengan .gif): ");
+        String gifName = scanner.next();
         String outputFolder = "../test/result/";
         String outputPath = outputFolder + outputName;
+        String gifPath = outputFolder + gifName;
 
         File resultDir = new File(outputFolder);
         if (!resultDir.exists()) {
@@ -103,9 +119,18 @@ public class QuadTreeCompression {
         }
 
         startTime = System.nanoTime();
-        QuadTreeNode root = buildQuadTree(img, 0, 0, img.getWidth(), img.getHeight(), 0);
-        long executionTime = System.nanoTime() - startTime + thresholdTime;
+        currentFrame = new BufferedImage(img.getWidth(), img.getHeight(), BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g = currentFrame.createGraphics();
+        g.setColor(new Color(averageColor(img, 0, 0, img.getWidth(), img.getHeight())));
+        g.fillRect(0, 0, img.getWidth(), img.getHeight());
+        g.dispose();
+        //frames.add(copyOf(currentFrame));
 
+        //QuadTreeNode root = buildQuadTree(img, 0, 0, img.getWidth(), img.getHeight(), 0);
+        QuadTreeNode root = buildQuadTreeBFS(img);
+        saveGif(gifPath, frames, 500); // delay per frame: 200ms
+        long executionTime = System.nanoTime() - startTime;
+        
         BufferedImage compressedImage = new BufferedImage(img.getWidth(), img.getHeight(), BufferedImage.TYPE_INT_RGB);
         drawQuadTree(compressedImage, root);
         ImageIO.write(compressedImage, "png", new File(outputPath));
@@ -122,27 +147,210 @@ public class QuadTreeCompression {
         System.out.println("Gambar hasil disimpan di: " + outputPath);
     }
 
-    private static QuadTreeNode buildQuadTree(BufferedImage img, int x, int y, int width, int height, int depth) {  
-        maxDepth = Math.max(maxDepth, depth);
-        int halfWidth = width / 2;
-        int halfHeight = height / 2;
+    private static BufferedImage copyOf(BufferedImage img) {
+        BufferedImage copy = new BufferedImage(img.getWidth(), img.getHeight(), BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g = copy.createGraphics();
+        g.drawImage(img, 0, 0, null);
+        g.dispose();
+        return copy;
+    }    
 
-            if (halfWidth * halfHeight <= minBlockSize || computeError(img, x, y, width, height) <= threshold) {
-                totalNodes++;
-                return new QuadTreeNode(x, y, width, height, averageColor(img, x, y, width, height), true);
-            }
-        
+    // private static QuadTreeNode buildQuadTree(BufferedImage img, int x, int y, int width, int height, int depth) {
+    //     maxDepth = Math.max(maxDepth, depth);
+    //     double err = computeError(img, x, y, width, height);
+    //     int halfWidth = width / 2;
+    //     int halfHeight = height / 2;
+    //     if (halfHeight*halfWidth <= minBlockSize || err <= threshold) {
+    //         totalNodes++;
+    //         int avgColor = averageColor(img, x, y, width, height);
+    //         QuadTreeNode leaf = new QuadTreeNode(x, y, width, height, avgColor, true);
+    //         return leaf;
+    //         //System.out.println(err);
+    //        // return new QuadTreeNode(x, y, width, height, averageColor(img, x, y, width, height), true);
+    //         //drawQuadTreeStep(leaf);
+    //         //return leaf;
+    //     }
+
+    //     //QuadTreeNode node = new QuadTreeNode(x, y, width, height, averageColor(img, x, y, width, height), false);
+    //     //drawQuadTreeStep(currentFrame, x, y, width, height);
+    
         
     
-        QuadTreeNode[] children = new QuadTreeNode[4];
-        children[0] = buildQuadTree(img, x, y, halfWidth, halfHeight, depth + 1); // Kiri Atas
-        children[1] = buildQuadTree(img, x + halfWidth, y, width - halfWidth, halfHeight, depth + 1); // Kanan Atas
-        children[2] = buildQuadTree(img, x, y + halfHeight, halfWidth, height - halfHeight, depth + 1); // Kiri Bawah
-        children[3] = buildQuadTree(img, x + halfWidth, y + halfHeight, width - halfWidth, height - halfHeight, depth + 1); // Kanan Bawah
+    //     QuadTreeNode[] children = new QuadTreeNode[4];
+    //     children[0] = buildQuadTree(img, x, y, halfWidth, halfHeight, depth + 1); // Kiri Atas
+    //     children[1] = buildQuadTree(img, x + halfWidth, y, width - halfWidth, halfHeight, depth + 1); // Kanan Atas
+    //     children[2] = buildQuadTree(img, x, y + halfHeight, halfWidth, height - halfHeight, depth + 1); // Kiri Bawah
+    //     children[3] = buildQuadTree(img, x + halfWidth, y + halfHeight, width - halfWidth, height - halfHeight, depth + 1); // Kanan Bawah
+        
+    //     //node.children = children;
 
-        QuadTreeNode node = new QuadTreeNode(x, y, width, height, averageColor(img, x, y, width, height), false);
-        node.children = children;
-        return node;
+    //     QuadTreeNode node = new QuadTreeNode(x, y, width, height, averageColor(img, x, y, width, height), false);
+    //     for (QuadTreeNode child : children) {
+    //         if (child.isLeaf) {
+    //             Graphics2D g = currentFrame.createGraphics();
+    //             g.setColor(new Color(child.color));
+    //             g.fillRect(child.x, child.y, child.width, child.height);
+    //             g.dispose();
+    //         }
+    //     }
+        
+    //     // Setelah semua leaf digambar, baru simpan frame gabungan ini
+    //     frames.add(copyOf(currentFrame));
+    //     //drawQuadTreeStep(currentFrame, node);
+    //     return node;
+    // }
+    private static QuadTreeNode buildQuadTreeBFS(BufferedImage img) {
+        Queue<QuadTreeNode> queue = new LinkedList<>();
+        QuadTreeNode root = new QuadTreeNode(0, 0, img.getWidth(), img.getHeight(),
+                averageColor(img, 0, 0, img.getWidth(), img.getHeight()), false);
+        queue.offer(root);
+    
+        currentFrame = new BufferedImage(img.getWidth(), img.getHeight(), BufferedImage.TYPE_INT_ARGB);
+        frames.clear();
+    
+        // Frame awal (satu warna)
+        Graphics2D gInit = currentFrame.createGraphics();
+        gInit.setColor(new Color(root.color));
+        gInit.fillRect(0, 0, img.getWidth(), img.getHeight());
+        gInit.dispose();
+        frames.add(copyOf(currentFrame));
+    
+        List<QuadTreeNode> currentLeaves = new ArrayList<>();
+    
+        while (!queue.isEmpty()) {
+            int size = queue.size();
+            List<QuadTreeNode> newChildren = new ArrayList<>();
+    
+            for (int i = 0; i < size; i++) {
+                QuadTreeNode node = queue.poll();
+                double err = computeError(img, node.x, node.y, node.width, node.height);
+
+                if((isMinBlock && (node.width * node.height <= minBlockSize || err <= threshold)) || !isMinBlock && (err <= threshold)){
+                    node.isLeaf = true;
+                    totalNodes++;
+                    currentLeaves.add(node);
+                }else {
+                    int halfWidth = node.width / 2;
+                    int halfHeight = node.height / 2;
+                    QuadTreeNode[] children = new QuadTreeNode[4];
+                    children[0] = new QuadTreeNode(node.x, node.y, halfWidth, halfHeight,
+                            averageColor(img, node.x, node.y, halfWidth, halfHeight), false);
+                    children[1] = new QuadTreeNode(node.x + halfWidth, node.y, node.width - halfWidth, halfHeight,
+                            averageColor(img, node.x + halfWidth, node.y, node.width - halfWidth, halfHeight), false);
+                    children[2] = new QuadTreeNode(node.x, node.y + halfHeight, halfWidth, node.height - halfHeight,
+                            averageColor(img, node.x, node.y + halfHeight, halfWidth, node.height - halfHeight), false);
+                    children[3] = new QuadTreeNode(node.x + halfWidth, node.y + halfHeight, node.width - halfWidth,
+                            node.height - halfHeight,
+                            averageColor(img, node.x + halfWidth, node.y + halfHeight, node.width - halfWidth,
+                                    node.height - halfHeight),
+                            false);
+    
+                    node.children = children;
+                    Collections.addAll(newChildren, children);
+                }
+            }
+            if (!newChildren.isEmpty()) {
+                Graphics2D g = currentFrame.createGraphics();
+                // gambar semua leaf
+                for (QuadTreeNode leaf : currentLeaves) {
+                    g.setColor(new Color(leaf.color));
+                    g.fillRect(leaf.x, leaf.y, leaf.width, leaf.height);
+                }
+                // gambar semua children baru
+                for (QuadTreeNode child : newChildren) {
+                    g.setColor(new Color(child.color));
+                    g.fillRect(child.x, child.y, child.width, child.height);
+                }
+                g.dispose();
+                frames.add(copyOf(currentFrame));
+                queue.addAll(newChildren);
+            }
+        }
+        return root;
+    }
+    
+    private static QuadTreeNode buildQuadTreeBFSwithThreshold(BufferedImage img, double thresholdVal) {
+        Queue<QuadTreeNode> queue = new LinkedList<>();
+        QuadTreeNode root = new QuadTreeNode(0, 0, img.getWidth(), img.getHeight(),
+                averageColor(img, 0, 0, img.getWidth(), img.getHeight()), false);
+        queue.offer(root);
+    
+        currentFrame = new BufferedImage(img.getWidth(), img.getHeight(), BufferedImage.TYPE_INT_ARGB);
+        frames.clear();
+    
+        // Frame awal (satu warna)
+        Graphics2D gInit = currentFrame.createGraphics();
+        gInit.setColor(new Color(root.color));
+        gInit.fillRect(0, 0, img.getWidth(), img.getHeight());
+        gInit.dispose();
+        frames.add(copyOf(currentFrame));
+    
+        List<QuadTreeNode> currentLeaves = new ArrayList<>();
+    
+        while (!queue.isEmpty()) {
+            int size = queue.size();
+            List<QuadTreeNode> newChildren = new ArrayList<>();
+    
+            for (int i = 0; i < size; i++) {
+                QuadTreeNode node = queue.poll();
+                double err = computeError(img, node.x, node.y, node.width, node.height);
+    
+                if ( err <= thresholdVal) {
+                    node.isLeaf = true;
+                    totalNodes++;
+                    currentLeaves.add(node);
+    
+                } else {
+                    int halfWidth = node.width / 2;
+                    int halfHeight = node.height / 2;
+                    QuadTreeNode[] children = new QuadTreeNode[4];
+                    children[0] = new QuadTreeNode(node.x, node.y, halfWidth, halfHeight,
+                            averageColor(img, node.x, node.y, halfWidth, halfHeight), false);
+                    children[1] = new QuadTreeNode(node.x + halfWidth, node.y, node.width - halfWidth, halfHeight,
+                            averageColor(img, node.x + halfWidth, node.y, node.width - halfWidth, halfHeight), false);
+                    children[2] = new QuadTreeNode(node.x, node.y + halfHeight, halfWidth, node.height - halfHeight,
+                            averageColor(img, node.x, node.y + halfHeight, halfWidth, node.height - halfHeight), false);
+                    children[3] = new QuadTreeNode(node.x + halfWidth, node.y + halfHeight, node.width - halfWidth,
+                            node.height - halfHeight,
+                            averageColor(img, node.x + halfWidth, node.y + halfHeight, node.width - halfWidth,
+                                    node.height - halfHeight),
+                            false);
+    
+                    node.children = children;
+                    Collections.addAll(newChildren, children);
+                }
+            }
+            if (!newChildren.isEmpty()) {
+                Graphics2D g = currentFrame.createGraphics();
+                // gambar semua leaf
+                for (QuadTreeNode leaf : currentLeaves) {
+                    g.setColor(new Color(leaf.color));
+                    g.fillRect(leaf.x, leaf.y, leaf.width, leaf.height);
+                }
+                // gambar semua children baru
+                for (QuadTreeNode child : newChildren) {
+                    g.setColor(new Color(child.color));
+                    g.fillRect(child.x, child.y, child.width, child.height);
+                }
+                g.dispose();
+                frames.add(copyOf(currentFrame));
+                queue.addAll(newChildren);
+            }
+        }
+        return root;
+    }
+
+    private static void saveGif(String path, List<BufferedImage> frames, int delayMs) throws IOException {
+        ImageOutputStream output = new FileImageOutputStream(new File(path));
+        GifSequenceWriter writer = new GifSequenceWriter(output, BufferedImage.TYPE_INT_ARGB, delayMs, true);
+        int i = 1;
+        for (BufferedImage frame : frames) {
+            writer.writeToSequence(frame);
+            //ImageIO.write(frame, "png", new File("frame_" + i + ".png"));
+            i++;
+        }
+        writer.close();
+        output.close();
     }
 
     private static void drawQuadTree(BufferedImage img, QuadTreeNode node) {
@@ -158,25 +366,25 @@ public class QuadTreeCompression {
         }
     }
 
-    private static QuadTreeNode buildQuadTreeWithThreshold(BufferedImage img, int x, int y, int width, int height, int depth, double thresholdVal) {
-        maxDepth = Math.max(maxDepth, depth);
-        if (width * height <= minBlockSize || computeError(img, x, y, width, height) <= thresholdVal) {
-            return new QuadTreeNode(x, y, width, height, averageColor(img, x, y, width, height), true);
-        }
+    // private static QuadTreeNode buildQuadTreeWithThreshold(BufferedImage img, int x, int y, int width, int height, int depth, double thresholdVal) {
+    //     maxDepth = Math.max(maxDepth, depth);
+    //     if (width * height <= minBlockSize || computeError(img, x, y, width, height) <= thresholdVal) {
+    //         return new QuadTreeNode(x, y, width, height, averageColor(img, x, y, width, height), true);
+    //     }
     
-        int halfWidth = width / 2;
-        int halfHeight = height / 2;
+    //     int halfWidth = width / 2;
+    //     int halfHeight = height / 2;
     
-        QuadTreeNode[] children = new QuadTreeNode[4];
-        children[0] = buildQuadTreeWithThreshold(img, x, y, halfWidth, halfHeight, depth + 1, thresholdVal);
-        children[1] = buildQuadTreeWithThreshold(img, x + halfWidth, y, width - halfWidth, halfHeight, depth + 1, thresholdVal);
-        children[2] = buildQuadTreeWithThreshold(img, x, y + halfHeight, halfWidth, height - halfHeight, depth + 1, thresholdVal);
-        children[3] = buildQuadTreeWithThreshold(img, x + halfWidth, y + halfHeight, width - halfWidth, height - halfHeight, depth + 1, thresholdVal);
+    //     QuadTreeNode[] children = new QuadTreeNode[4];
+    //     children[0] = buildQuadTreeWithThreshold(img, x, y, halfWidth, halfHeight, depth + 1, thresholdVal);
+    //     children[1] = buildQuadTreeWithThreshold(img, x + halfWidth, y, width - halfWidth, halfHeight, depth + 1, thresholdVal);
+    //     children[2] = buildQuadTreeWithThreshold(img, x, y + halfHeight, halfWidth, height - halfHeight, depth + 1, thresholdVal);
+    //     children[3] = buildQuadTreeWithThreshold(img, x + halfWidth, y + halfHeight, width - halfWidth, height - halfHeight, depth + 1, thresholdVal);
     
-        QuadTreeNode node = new QuadTreeNode(x, y, width, height, averageColor(img, x, y, width, height), false);
-        node.children = children;
-        return node;
-    }
+    //     QuadTreeNode node = new QuadTreeNode(x, y, width, height, averageColor(img, x, y, width, height), false);
+    //     node.children = children;
+    //     return node;
+    // }
 
     private static double findBestThreshold(BufferedImage img, long originalSize) throws IOException {
         double low = 0;
@@ -189,7 +397,7 @@ public class QuadTreeCompression {
     
         // Step 1: Perluas high jika kompresi masih negatif
         while (true) {
-            QuadTreeNode root = buildQuadTreeWithThreshold(img, 0, 0, img.getWidth(), img.getHeight(), 0, high);
+            QuadTreeNode root = buildQuadTreeBFSwithThreshold(img, high);
             int compressed = getSerializedSize(root);
             achievedCompression = 1.0 - ((double) compressed / originalSize);
             // System.out.printf("[EXTEND-HIGH] Threshold=%.2f | Compressed=%d | Achieved=%.4f\n", high, compressed, achievedCompression);
@@ -209,7 +417,7 @@ public class QuadTreeCompression {
             int count = 0;
             while (diff > 0.001 && count <=5) {
                 double mid = (low + high) / 2;
-                QuadTreeNode root = buildQuadTreeWithThreshold(img, 0, 0, img.getWidth(), img.getHeight(), 0, mid);
+                QuadTreeNode root = buildQuadTreeBFSwithThreshold(img, mid);
                 int compressed = getSerializedSize(root);
                 achievedCompression = 1.0 - ((double) compressed / originalSize);
         
@@ -243,6 +451,7 @@ public class QuadTreeCompression {
             case 2: return computeMAD(img, x, y, width, height);
             case 3: return computeMaxDiff(img, x, y, width, height);
             case 4: return computeEntropy(img, x, y, width, height);
+            case 5: return computeSSIM(img, x, y, width, height);
             default: return computeVariance(img, x, y, width, height);
         }
     }
@@ -427,6 +636,55 @@ public class QuadTreeCompression {
         }
 
         return (rEntro+gEntro+bEntro)/3;
+    }
+
+    private static double computeSSIM(BufferedImage img, int x, int y, int width, int height) {
+        Color avgColor = new Color(averageColor(img, x, y, width, height));
+        int ryMean = avgColor.getRed();
+        int gyMean = avgColor.getGreen();
+        int byMean = avgColor.getBlue();
+        // C = (KL)^2, K = 0.01, K = 0.03
+        double C1 = 6.5025, C2 = 58.5225;
+        int rx = 0, gx = 0, bx = 0;
+        int rxSum = 0, gxSum = 0, bxSum = 0;
+        int count = 0;
+
+        for (int i = x; i < x + width && i < img.getWidth(); i++) {
+            for (int j = y; j < y + height && j < img.getHeight(); j++) {
+                int color = img.getRGB(i, j);
+                rx = (color >> 16) & 0xFF;
+                gx = (color >> 8) & 0xFF;
+                bx = color & 0xFF;
+                rxSum += rx;
+                gxSum += gx;
+                bxSum += bx;
+                count++; 
+            }
+        }
+        
+        if (count == 0) return 0; 
+        double rxMean = (double) rxSum / count;
+        double gxMean = (double) gxSum / count;
+        double bxMean = (double) bxSum / count;
+
+        double rxVar = 0, gxVar = 0, bxVar = 0;
+        for (int i = x; i < x + width; i++) {
+            for (int j = y; j < y + height; j++) {
+                int color = img.getRGB(i, j);
+                double r = ((color >> 16) & 0xFF) - rxMean;
+                double g = ((color >> 8) & 0xFF) - gxMean;
+                double b = (color & 0xFF) - bxMean;
+                rxVar += r * r;
+                gxVar += g * g;
+                bxVar += b * b;
+            }
+        }
+
+        double rSSIM = ((2*rxMean*ryMean+C1)*C2)/((rxMean*rxMean+ryMean*ryMean+C1)*(rxVar+C2));
+        double gSSIM = ((2*gxMean*gyMean+C1)*C2)/((gxMean*gxMean+gyMean*gyMean+C1)*(gxVar+C2));
+        double bSSIM = ((2*bxMean*byMean+C1)*C2)/((bxMean*bxMean+byMean*byMean+C1)*(bxVar+C2));
+
+        return (0.2989*rSSIM+0.5870*gSSIM+0.1140*bSSIM);
     }
 
     public static int getSerializedSize(QuadTreeNode root) throws IOException{
