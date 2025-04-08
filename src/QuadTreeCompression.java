@@ -102,21 +102,22 @@ public class QuadTreeCompression {
         }
         System.out.print("Masukkan nama gambar hasil (beserta ekstensinya .jpg/.jpeg./.png): ");
         String outputName = scanner.next();
+
         System.out.print("Masukkan nama file GIF hasil (akhiri dengan .gif): ");
         String gifName = scanner.next();
-        String outputFolder = "../test/result/";
-        String outputPath = outputFolder + outputName;
-        String gifPath = outputFolder + gifName;
+        //String outputFolder = "../test/result/";
+        String outputPath = outputName;
+        String gifPath = gifName;
 
-        File resultDir = new File(outputFolder);
-        if (!resultDir.exists()) {
-            if (resultDir.mkdirs()) {
-                System.out.println("Folder 'result' berhasil dibuat.");
-            } else {
-                System.out.println("Gagal membuat folder 'result'. Pastikan program memiliki izin menulis.");
-                return;
-            }
-        }
+        // File resultDir = new File(outputFolder);
+        // if (!resultDir.exists()) {
+        //     if (resultDir.mkdirs()) {
+        //         System.out.println("Folder 'result' berhasil dibuat.");
+        //     } else {
+        //         System.out.println("Gagal membuat folder 'result'. Pastikan program memiliki izin menulis.");
+        //         return;
+        //     }
+        // }
 
         startTime = System.nanoTime();
         currentFrame = new BufferedImage(img.getWidth(), img.getHeight(), BufferedImage.TYPE_INT_ARGB);
@@ -145,6 +146,7 @@ public class QuadTreeCompression {
         System.out.println("Kedalaman maksimal pohon: " + maxDepth);
         System.out.println("Total simpul pohon: " + totalNodes);
         System.out.println("Gambar hasil disimpan di: " + outputPath);
+        System.out.println("GIF hasil disimpan di: " + gifPath);
     }
 
     private static BufferedImage copyOf(BufferedImage img) {
