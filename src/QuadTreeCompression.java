@@ -153,52 +153,8 @@ public class QuadTreeCompression {
         g.drawImage(img, 0, 0, null);
         g.dispose();
         return copy;
-    }    
+    }            
 
-    // private static QuadTreeNode buildQuadTree(BufferedImage img, int x, int y, int width, int height, int depth) {
-    //     maxDepth = Math.max(maxDepth, depth);
-    //     double err = computeError(img, x, y, width, height);
-    //     int halfWidth = width / 2;
-    //     int halfHeight = height / 2;
-    //     if (halfHeight*halfWidth <= minBlockSize || err <= threshold) {
-    //         totalNodes++;
-    //         int avgColor = averageColor(img, x, y, width, height);
-    //         QuadTreeNode leaf = new QuadTreeNode(x, y, width, height, avgColor, true);
-    //         return leaf;
-    //         //System.out.println(err);
-    //        // return new QuadTreeNode(x, y, width, height, averageColor(img, x, y, width, height), true);
-    //         //drawQuadTreeStep(leaf);
-    //         //return leaf;
-    //     }
-
-    //     //QuadTreeNode node = new QuadTreeNode(x, y, width, height, averageColor(img, x, y, width, height), false);
-    //     //drawQuadTreeStep(currentFrame, x, y, width, height);
-    
-        
-    
-    //     QuadTreeNode[] children = new QuadTreeNode[4];
-    //     children[0] = buildQuadTree(img, x, y, halfWidth, halfHeight, depth + 1); // Kiri Atas
-    //     children[1] = buildQuadTree(img, x + halfWidth, y, width - halfWidth, halfHeight, depth + 1); // Kanan Atas
-    //     children[2] = buildQuadTree(img, x, y + halfHeight, halfWidth, height - halfHeight, depth + 1); // Kiri Bawah
-    //     children[3] = buildQuadTree(img, x + halfWidth, y + halfHeight, width - halfWidth, height - halfHeight, depth + 1); // Kanan Bawah
-        
-    //     //node.children = children;
-
-    //     QuadTreeNode node = new QuadTreeNode(x, y, width, height, averageColor(img, x, y, width, height), false);
-    //     for (QuadTreeNode child : children) {
-    //         if (child.isLeaf) {
-    //             Graphics2D g = currentFrame.createGraphics();
-    //             g.setColor(new Color(child.color));
-    //             g.fillRect(child.x, child.y, child.width, child.height);
-    //             g.dispose();
-    //         }
-    //     }
-        
-    //     // Setelah semua leaf digambar, baru simpan frame gabungan ini
-    //     frames.add(copyOf(currentFrame));
-    //     //drawQuadTreeStep(currentFrame, node);
-    //     return node;
-    // }
     private static QuadTreeNode buildQuadTreeBFS(BufferedImage img) {
         Queue<QuadTreeNode> queue = new LinkedList<>();
         QuadTreeNode root = new QuadTreeNode(0, 0, img.getWidth(), img.getHeight(),
@@ -366,25 +322,6 @@ public class QuadTreeCompression {
         }
     }
 
-    // private static QuadTreeNode buildQuadTreeWithThreshold(BufferedImage img, int x, int y, int width, int height, int depth, double thresholdVal) {
-    //     maxDepth = Math.max(maxDepth, depth);
-    //     if (width * height <= minBlockSize || computeError(img, x, y, width, height) <= thresholdVal) {
-    //         return new QuadTreeNode(x, y, width, height, averageColor(img, x, y, width, height), true);
-    //     }
-    
-    //     int halfWidth = width / 2;
-    //     int halfHeight = height / 2;
-    
-    //     QuadTreeNode[] children = new QuadTreeNode[4];
-    //     children[0] = buildQuadTreeWithThreshold(img, x, y, halfWidth, halfHeight, depth + 1, thresholdVal);
-    //     children[1] = buildQuadTreeWithThreshold(img, x + halfWidth, y, width - halfWidth, halfHeight, depth + 1, thresholdVal);
-    //     children[2] = buildQuadTreeWithThreshold(img, x, y + halfHeight, halfWidth, height - halfHeight, depth + 1, thresholdVal);
-    //     children[3] = buildQuadTreeWithThreshold(img, x + halfWidth, y + halfHeight, width - halfWidth, height - halfHeight, depth + 1, thresholdVal);
-    
-    //     QuadTreeNode node = new QuadTreeNode(x, y, width, height, averageColor(img, x, y, width, height), false);
-    //     node.children = children;
-    //     return node;
-    // }
 
     private static double findBestThreshold(BufferedImage img, long originalSize) throws IOException {
         double low = 0;
