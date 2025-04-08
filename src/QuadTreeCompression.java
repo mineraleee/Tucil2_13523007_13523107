@@ -183,7 +183,7 @@ public class QuadTreeCompression {
                 int halfWidth = node.width / 2;
                 int halfHeight = node.height / 2;
 
-                if((isMinBlock && (halfWidth*halfHeight <= minBlockSize || err <= threshold)) || !isMinBlock && (err <= threshold)){
+                if((isMinBlock && (halfWidth*halfHeight < minBlockSize || err < threshold)) || !isMinBlock && (err < threshold)){
                     node.isLeaf = true;
                     totalNodes++;
                     currentLeaves.add(node);
@@ -251,7 +251,7 @@ public class QuadTreeCompression {
                 QuadTreeNode node = queue.poll();
                 double err = computeError(img, node.x, node.y, node.width, node.height);
     
-                if (err <= thresholdVal) {
+                if (err < thresholdVal) {
                     node.isLeaf = true;
                     totalNodes++;
                     currentLeaves.add(node);
