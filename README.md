@@ -85,7 +85,7 @@ g. **[INPUT]** Alamat absolut file GIF.
 
 ## Kontributor
 
-| NIM      | Name  | Class |
+| NIM      | Nama  | Kelas |
 | :---:    | :---: | :---: |
 | 13523007| Ranashahira Reztaputri|01|
 | 13523107| Heleni Gratia Meitrina Tampubolon|02|
