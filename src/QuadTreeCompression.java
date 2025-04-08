@@ -180,14 +180,14 @@ public class QuadTreeCompression {
             for (int i = 0; i < size; i++) {
                 QuadTreeNode node = queue.poll();
                 double err = computeError(img, node.x, node.y, node.width, node.height);
+                int halfWidth = node.width / 2;
+                int halfHeight = node.height / 2;
 
-                if((isMinBlock && (node.width * node.height <= minBlockSize || err <= threshold)) || !isMinBlock && (err <= threshold)){
+                if((isMinBlock && (halfWidth*halfHeight <= minBlockSize || err <= threshold)) || !isMinBlock && (err <= threshold)){
                     node.isLeaf = true;
                     totalNodes++;
                     currentLeaves.add(node);
                 }else {
-                    int halfWidth = node.width / 2;
-                    int halfHeight = node.height / 2;
                     QuadTreeNode[] children = new QuadTreeNode[4];
                     children[0] = new QuadTreeNode(node.x, node.y, halfWidth, halfHeight,
                             averageColor(img, node.x, node.y, halfWidth, halfHeight), false);
@@ -228,7 +228,7 @@ public class QuadTreeCompression {
     private static QuadTreeNode buildQuadTreeBFSwithThreshold(BufferedImage img, double thresholdVal) {
         Queue<QuadTreeNode> queue = new LinkedList<>();
         QuadTreeNode root = new QuadTreeNode(0, 0, img.getWidth(), img.getHeight(),
-                averageColor(img, 0, 0, img.getWidth(), img.getHeight()), false);
+        averageColor(img, 0, 0, img.getWidth(), img.getHeight()), false);
         queue.offer(root);
     
         currentFrame = new BufferedImage(img.getWidth(), img.getHeight(), BufferedImage.TYPE_INT_ARGB);
@@ -251,7 +251,7 @@ public class QuadTreeCompression {
                 QuadTreeNode node = queue.poll();
                 double err = computeError(img, node.x, node.y, node.width, node.height);
     
-                if ( err <= thresholdVal) {
+                if (err <= thresholdVal) {
                     node.isLeaf = true;
                     totalNodes++;
                     currentLeaves.add(node);
