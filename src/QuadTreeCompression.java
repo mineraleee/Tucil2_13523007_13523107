@@ -1,11 +1,14 @@
 import java.awt.*;
 import java.awt.image.BufferedImage;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
+import java.io.ObjectOutputStream;
 import java.util.Scanner;
 import javax.imageio.ImageIO;
+import java.io.Serializable;
 
-class QuadTreeNode {
+class QuadTreeNode implements Serializable{
     int x, y, width, height, color;
     boolean isLeaf;
     QuadTreeNode[] children;
@@ -25,9 +28,10 @@ public class QuadTreeCompression {
     private static int method;
     private static double threshold;
     private static int minBlockSize;
-    private static long startTime;
+    private static long startTime, thresholdTime =0;
     private static int totalNodes = 0;
     private static int maxDepth = 0;
+    private static double targetCompression;
 
     public static void main(String[] args) throws Exception {
         Scanner scanner = new Scanner(System.in);
@@ -41,7 +45,7 @@ public class QuadTreeCompression {
             imagePath = "../test/source/" + imageName;
 
             File imageFile = new File(imagePath);
-
+    
             // Cek apakah file ada
             if (!imageFile.exists() || imageFile.isDirectory()) {
                 System.out.println("File tidak ditemukan. Silakan masukkan nama gambar yang benar.");
@@ -65,12 +69,24 @@ public class QuadTreeCompression {
             }
         }
         
+        File inputFile = new File (imagePath);
+        long originalSize = inputFile.length();
+        
         System.out.print("Pilih metode error (1: Variansi, 2: MAD, 3: Max Pixel Difference, 4: Entropy): ");
         method = scanner.nextInt();
-        System.out.print("Masukkan threshold: ");
-        threshold = scanner.nextDouble();
+       
         System.out.print("Masukkan ukuran blok minimum: ");
         minBlockSize = scanner.nextInt();
+        System.out.print("Masukkan target persentase kompresi (beri nilai 0 jika ingin menonaktifkan): ");
+        targetCompression = scanner.nextDouble();
+        if (targetCompression == 0){
+            System.out.print("Masukkan threshold: ");
+            threshold = scanner.nextDouble();
+        } else{
+            long thresholdStart = System.nanoTime();
+            threshold = findBestThreshold (img, originalSize);
+            thresholdTime = System.nanoTime() - thresholdStart;
+        }
         System.out.print("Masukkan nama gambar hasil (beserta ekstensinya .jpg/.png): ");
         String outputName = scanner.next();
         String outputFolder = "../test/result/";
@@ -86,17 +102,15 @@ public class QuadTreeCompression {
             }
         }
 
-        int originalSize = img.getWidth() * img.getHeight() * 3;
-
         startTime = System.nanoTime();
         QuadTreeNode root = buildQuadTree(img, 0, 0, img.getWidth(), img.getHeight(), 0);
-        long executionTime = System.nanoTime() - startTime;
+        long executionTime = System.nanoTime() - startTime + thresholdTime;
 
         BufferedImage compressedImage = new BufferedImage(img.getWidth(), img.getHeight(), BufferedImage.TYPE_INT_RGB);
         drawQuadTree(compressedImage, root);
         ImageIO.write(compressedImage, "png", new File(outputPath));
 
-        int compressedSize = totalNodes * 4; // Asumsi tiap simpul menyimpan 4 byte data
+        int compressedSize = getSerializedSize(root); 
         double compressionPercentage = 100.0 - ((double) compressedSize / originalSize * 100);
 
         System.out.println("Waktu eksekusi: " + (executionTime / 1e6) + " ms");
@@ -110,21 +124,22 @@ public class QuadTreeCompression {
 
     private static QuadTreeNode buildQuadTree(BufferedImage img, int x, int y, int width, int height, int depth) {  
         maxDepth = Math.max(maxDepth, depth);
-        if (width * height <= minBlockSize || computeError(img, x, y, width, height) <= threshold) {
-            totalNodes++;
-            //System.out.println("TesTes");
-            return new QuadTreeNode(x, y, width, height, averageColor(img, x, y, width, height), true);
-        }
-    
         int halfWidth = width / 2;
         int halfHeight = height / 2;
+
+            if (halfWidth * halfHeight <= minBlockSize || computeError(img, x, y, width, height) <= threshold) {
+                totalNodes++;
+                return new QuadTreeNode(x, y, width, height, averageColor(img, x, y, width, height), true);
+            }
+        
+        
     
         QuadTreeNode[] children = new QuadTreeNode[4];
         children[0] = buildQuadTree(img, x, y, halfWidth, halfHeight, depth + 1); // Kiri Atas
         children[1] = buildQuadTree(img, x + halfWidth, y, width - halfWidth, halfHeight, depth + 1); // Kanan Atas
         children[2] = buildQuadTree(img, x, y + halfHeight, halfWidth, height - halfHeight, depth + 1); // Kiri Bawah
         children[3] = buildQuadTree(img, x + halfWidth, y + halfHeight, width - halfWidth, height - halfHeight, depth + 1); // Kanan Bawah
-    
+
         QuadTreeNode node = new QuadTreeNode(x, y, width, height, averageColor(img, x, y, width, height), false);
         node.children = children;
         return node;
@@ -141,6 +156,85 @@ public class QuadTreeCompression {
                 if (child != null) drawQuadTree(img, child);
             }
         }
+    }
+
+    private static QuadTreeNode buildQuadTreeWithThreshold(BufferedImage img, int x, int y, int width, int height, int depth, double thresholdVal) {
+        maxDepth = Math.max(maxDepth, depth);
+        if (width * height <= minBlockSize || computeError(img, x, y, width, height) <= thresholdVal) {
+            return new QuadTreeNode(x, y, width, height, averageColor(img, x, y, width, height), true);
+        }
+    
+        int halfWidth = width / 2;
+        int halfHeight = height / 2;
+    
+        QuadTreeNode[] children = new QuadTreeNode[4];
+        children[0] = buildQuadTreeWithThreshold(img, x, y, halfWidth, halfHeight, depth + 1, thresholdVal);
+        children[1] = buildQuadTreeWithThreshold(img, x + halfWidth, y, width - halfWidth, halfHeight, depth + 1, thresholdVal);
+        children[2] = buildQuadTreeWithThreshold(img, x, y + halfHeight, halfWidth, height - halfHeight, depth + 1, thresholdVal);
+        children[3] = buildQuadTreeWithThreshold(img, x + halfWidth, y + halfHeight, width - halfWidth, height - halfHeight, depth + 1, thresholdVal);
+    
+        QuadTreeNode node = new QuadTreeNode(x, y, width, height, averageColor(img, x, y, width, height), false);
+        node.children = children;
+        return node;
+    }
+
+    private static double findBestThreshold(BufferedImage img, long originalSize) throws IOException {
+        double low = 0;
+        double high = 10;
+        double bestCompressionDiff = Double.MAX_VALUE;
+        double achievedCompression =0;
+        int iteration = 0;
+
+        // System.out.println("Target Compression: " + targetCompression);
+    
+        // Step 1: Perluas high jika kompresi masih negatif
+        while (true) {
+            QuadTreeNode root = buildQuadTreeWithThreshold(img, 0, 0, img.getWidth(), img.getHeight(), 0, high);
+            int compressed = getSerializedSize(root);
+            achievedCompression = 1.0 - ((double) compressed / originalSize);
+            // System.out.printf("[EXTEND-HIGH] Threshold=%.2f | Compressed=%d | Achieved=%.4f\n", high, compressed, achievedCompression);
+    
+            if (achievedCompression >= targetCompression) break;
+            high += 500;
+        }
+        double bestThreshold = high;
+        double highest = high;
+        double diff = Math.abs(achievedCompression - targetCompression);
+    
+        // Step 2: Binary search
+        while (iteration <=5 && diff>0.001){
+            // System.out.println("achieved found: " + achievedCompression);
+            // System.out.println("target: " + targetCompression);
+            // System.out.println("diff: " + diff);
+            int count = 0;
+            while (diff > 0.001 && count <=5) {
+                double mid = (low + high) / 2;
+                QuadTreeNode root = buildQuadTreeWithThreshold(img, 0, 0, img.getWidth(), img.getHeight(), 0, mid);
+                int compressed = getSerializedSize(root);
+                achievedCompression = 1.0 - ((double) compressed / originalSize);
+        
+                diff = Math.abs(achievedCompression - targetCompression);
+                if (achievedCompression >= 0 && diff < bestCompressionDiff) {
+                    bestCompressionDiff = diff;
+                    bestThreshold = mid;
+                }
+        
+                if (achievedCompression < targetCompression) {
+                    low = mid;
+                } else {
+                    high = mid;
+                }
+                count++;
+                // System.out.printf("Mid: %.2f | Achieved: %.4f | Diff: %.4f | Best: %.2f\n", mid, achievedCompression, diff, bestThreshold);
+            }
+            // System.out.println("-----");
+            high = highest+500;
+            low = 0;
+            highest = high;
+            iteration++;
+        }
+        // System.out.println("Best threshold found: " + bestThreshold);
+        return bestThreshold;
     }
 
     private static double computeError(BufferedImage img, int x, int y, int width, int height) {
@@ -333,5 +427,14 @@ public class QuadTreeCompression {
         }
 
         return (rEntro+gEntro+bEntro)/3;
+    }
+
+    public static int getSerializedSize(QuadTreeNode root) throws IOException{
+        ByteArrayOutputStream size = new ByteArrayOutputStream(); // size ==> to write the quadtree
+        ObjectOutputStream oos = new ObjectOutputStream(size); //oos ==> into bytes
+        oos.writeObject(root);
+        oos.flush();
+        oos.close();
+        return size.toByteArray().length;
     }
 }
