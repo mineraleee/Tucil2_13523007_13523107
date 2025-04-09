@@ -607,7 +607,7 @@ public class QuadTreeCompression {
         double gSSIM = ((2*gxMean*gyMean+C1)*C2)/((gxMean*gxMean+gyMean*gyMean+C1)*(gxVar+C2));
         double bSSIM = ((2*bxMean*byMean+C1)*C2)/((bxMean*bxMean+byMean*byMean+C1)*(bxVar+C2));
 
-        return (0.2989*rSSIM+0.5870*gSSIM+0.1140*bSSIM);
+        return (0.299*rSSIM+0.587*gSSIM+0.114*bSSIM);
     }
 
     public static int getSerializedSize(QuadTreeNode root) throws IOException{
