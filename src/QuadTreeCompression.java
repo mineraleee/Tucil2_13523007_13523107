@@ -310,20 +310,6 @@ public class QuadTreeCompression {
                 }
             }
             if (!newChildren.isEmpty()) {
-                Graphics2D g = currentFrame.createGraphics();
-                // gambar semua leaf
-                for (QuadTreeNode leaf : currentLeaves) {
-                    g.setColor(new Color(leaf.color));
-                    g.fillRect(leaf.x, leaf.y, leaf.width, leaf.height);
-                }
-                // gambar semua children baru
-                for (QuadTreeNode child : newChildren) {
-                    maxDepth = Math.max(maxDepth, child.depth);
-                    g.setColor(new Color(child.color));
-                    g.fillRect(child.x, child.y, child.width, child.height);
-                }
-                g.dispose();
-                frames.add(copyOf(currentFrame));
                 queue.addAll(newChildren);
             }
         }
