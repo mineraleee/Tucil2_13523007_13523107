@@ -50,9 +50,9 @@ public class QuadTreeCompression {
 
         // Loop untuk validasi gambar
         while (true) {
-            System.out.print("Masukkan nama gambar (beserta ekstensi .jpg/.png): ");
+            System.out.print("Masukkan nama gambar (beserta ekstensi .jpg/.jpeg./.png): ");
             String imageName = scanner.nextLine();
-            imagePath = "../test/source/" + imageName;
+            imagePath = imageName;
 
             File imageFile = new File(imagePath);
     
