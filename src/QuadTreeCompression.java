@@ -14,6 +14,8 @@ import javax.imageio.stream.FileImageOutputStream;
 import javax.imageio.stream.ImageOutputStream;
 import java.io.ObjectOutputStream;
 import java.io.Serializable;
+import java.awt.Color;
+import java.awt.Graphics2D;
 
 class QuadTreeNode implements Serializable{
     int x, y, width, height, color, depth;
@@ -44,10 +46,33 @@ public class QuadTreeCompression {
     private static double targetCompression;
     private static boolean isMinBlock;
 
+    public static final String ANSI_RESET = "\u001B[0m";
+    public static final String ANSI_CYAN = "\u001B[36m";
+    public static final String ANSI_GREEN = "\u001B[32m";
+    public static final String ANSI_YELLOW = "\u001B[33m";
+    public static final String ANSI_BLUE = "\u001B[34m";
+
+    public static void printTableHeader() {
+        System.out.println(ANSI_CYAN + "+-------------------------------------+--------------------------+" + ANSI_RESET);
+        System.out.println(ANSI_CYAN + "|             Parameter               |          Nilai           |" + ANSI_RESET);
+        System.out.println(ANSI_CYAN + "+-------------------------------------+--------------------------+" + ANSI_RESET);
+    }
+    
+    public static void printRow(String parameter, String value, String color) {
+        System.out.printf("| %-44s | %-24s |\n", color + parameter + ANSI_RESET, value);
+    }
+    
+
+    public static void printTableFooter() {
+        System.out.println(ANSI_CYAN + "+-------------------------------------+--------------------------+" + ANSI_RESET);
+    }
+
     public static void main(String[] args) throws Exception {
         Scanner scanner = new Scanner(System.in);
         BufferedImage img = null;
         String imagePath;
+
+        printTableHeader();
 
         // Loop untuk validasi gambar
         while (true) {
@@ -71,7 +96,7 @@ public class QuadTreeCompression {
                     System.out.println("Format gambar tidak didukung atau file rusak. Silakan masukkan gambar lain.");
                     continue;
                 }
-
+                printRow("Nama Gambar", imageName, ANSI_GREEN);
                 // Jika gambar valid, keluar dari loop
                 break;
 
@@ -85,40 +110,41 @@ public class QuadTreeCompression {
         
         System.out.print("Pilih metode error (1: Variansi, 2: MAD, 3: Max Pixel Difference, 4: Entropy, 5: SSIM): ");
         method = scanner.nextInt();
+        printRow("Metode Error", String.valueOf(method), ANSI_YELLOW);
        
        
         System.out.print("Masukkan target persentase kompresi (beri nilai 0 jika ingin menonaktifkan): ");
         targetCompression = scanner.nextDouble();
+        printRow("Target Kompresi", String.valueOf(targetCompression), ANSI_BLUE);
+
         if (targetCompression == 0){
             isMinBlock = false;
             System.out.print("Masukkan threshold: ");
             threshold = scanner.nextDouble();
+            printRow("Threshold", String.valueOf(threshold), ANSI_BLUE);
+
             System.out.print("Masukkan ukuran blok minimum: ");
             minBlockSize = scanner.nextInt();
+            printRow("Blok Minimum", String.valueOf(minBlockSize), ANSI_BLUE);
         } else{
             isMinBlock = true;
             long thresholdStart = System.nanoTime();
             threshold = findBestThreshold (img, originalSize);
             thresholdTime = System.nanoTime() - thresholdStart;
+            printRow("Threshold Otomatis", String.format("%.2f", threshold), ANSI_BLUE);
         }
         System.out.print("Masukkan nama gambar hasil (beserta ekstensinya .jpg/.jpeg./.png): ");
         String outputName = scanner.next();
+        printRow("Output Gambar", outputName, ANSI_GREEN);
 
         System.out.print("Masukkan nama file GIF hasil (akhiri dengan .gif): ");
         String gifName = scanner.next();
-        //String outputFolder = "../test/result/";
+        printRow("Output GIF", gifName, ANSI_GREEN);
+
+        printTableFooter();
+
         String outputPath = outputName;
         String gifPath = gifName;
-
-        // File resultDir = new File(outputFolder);
-        // if (!resultDir.exists()) {
-        //     if (resultDir.mkdirs()) {
-        //         System.out.println("Folder 'result' berhasil dibuat.");
-        //     } else {
-        //         System.out.println("Gagal membuat folder 'result'. Pastikan program memiliki izin menulis.");
-        //         return;
-        //     }
-        // }
 
         startTime = System.nanoTime();
         currentFrame = new BufferedImage(img.getWidth(), img.getHeight(), BufferedImage.TYPE_INT_ARGB);
@@ -126,9 +152,7 @@ public class QuadTreeCompression {
         g.setColor(new Color(averageColor(img, 0, 0, img.getWidth(), img.getHeight())));
         g.fillRect(0, 0, img.getWidth(), img.getHeight());
         g.dispose();
-        //frames.add(copyOf(currentFrame));
 
-        //QuadTreeNode root = buildQuadTree(img, 0, 0, img.getWidth(), img.getHeight(), 0);
         QuadTreeNode root = buildQuadTreeBFS(img);
         saveGif(gifPath, frames, 500); // delay per frame: 200ms
         long executionTime = System.nanoTime() - startTime;
@@ -140,15 +164,20 @@ public class QuadTreeCompression {
         int compressedSize = getSerializedSize(root); 
         double compressionPercentage = 100.0 - ((double) compressedSize / originalSize * 100);
 
-        System.out.println("Waktu eksekusi: " + (executionTime / 1e6) + " ms");
-        System.out.println("Ukuran gambar sebelum: " + originalSize + " bytes");
-        System.out.println("Ukuran gambar setelah: " + compressedSize + " bytes");
-        System.out.println("Persentase kompresi: " + String.format("%.2f", compressionPercentage) + "%");
-        System.out.println("Kedalaman maksimal pohon: " + maxDepth);
-        System.out.println("Total simpul pohon: " + totalNodes);
+        System.out.println("\n" + ANSI_GREEN + "Hasil Kompresi:" + ANSI_RESET);
+        printTableHeader();
+        printRow("Ukuran Awal", originalSize + " bytes", ANSI_YELLOW);
+        printRow("Ukuran Akhir", compressedSize + " bytes", ANSI_YELLOW);
+        printRow("Kompresi", String.format("%.2f%%", compressionPercentage), ANSI_GREEN);
+        printRow("Waktu Eksekusi", String.format("%.2f ms", executionTime / 1e6), ANSI_CYAN);
+        printRow("Kedalaman Maksimal", String.valueOf(maxDepth), ANSI_CYAN);
+        printRow("Total Simpul", String.valueOf(totalNodes), ANSI_CYAN);
+        printTableFooter();
+
         System.out.println("Gambar hasil disimpan di: " + outputPath);
         System.out.println("GIF hasil disimpan di: " + gifPath);
     }
+    
 
     private static BufferedImage copyOf(BufferedImage img) {
         BufferedImage copy = new BufferedImage(img.getWidth(), img.getHeight(), BufferedImage.TYPE_INT_ARGB);
@@ -290,7 +319,6 @@ public class QuadTreeCompression {
         int i = 1;
         for (BufferedImage frame : frames) {
             writer.writeToSequence(frame);
-            //ImageIO.write(frame, "png", new File("frame_" + i + ".png"));
             i++;
         }
         writer.close();
@@ -316,9 +344,10 @@ public class QuadTreeCompression {
         double high = 10;
         double bestCompressionDiff = Double.MAX_VALUE;
         double achievedCompression =0;
+        double achievedBefore = 0;
         int iteration = 0;
 
-        // System.out.println("Target Compression: " + targetCompression);
+        System.out.println("Target Compression: " + targetCompression);
     
         // Step 1: Perluas high jika kompresi masih negatif
         while (true) {
@@ -327,8 +356,9 @@ public class QuadTreeCompression {
             achievedCompression = 1.0 - ((double) compressed / originalSize);
             // System.out.printf("[EXTEND-HIGH] Threshold=%.2f | Compressed=%d | Achieved=%.4f\n", high, compressed, achievedCompression);
     
-            if (achievedCompression >= targetCompression) break;
+            if ((achievedCompression >= targetCompression)||(achievedBefore == achievedCompression)) break;
             high += 500;
+            achievedBefore = achievedCompression;
         }
         double bestThreshold = high;
         double highest = high;
@@ -385,9 +415,6 @@ public class QuadTreeCompression {
         long rSum = 0, gSum = 0, bSum = 0;
         int count = 0;
 
-        // if (width * height > minBlockSize){
-        //     return 0;
-        // }
         // Hitung rata-rata tiap kanal warna
         for (int i = x; i < x + width; i++) {
             for (int j = y; j < y + height; j++) {
