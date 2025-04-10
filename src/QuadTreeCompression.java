@@ -105,19 +105,8 @@ public class QuadTreeCompression {
 
         System.out.print("Masukkan nama file GIF hasil (akhiri dengan .gif): ");
         String gifName = scanner.next();
-        //String outputFolder = "../test/result/";
         String outputPath = outputName;
         String gifPath = gifName;
-
-        // File resultDir = new File(outputFolder);
-        // if (!resultDir.exists()) {
-        //     if (resultDir.mkdirs()) {
-        //         System.out.println("Folder 'result' berhasil dibuat.");
-        //     } else {
-        //         System.out.println("Gagal membuat folder 'result'. Pastikan program memiliki izin menulis.");
-        //         return;
-        //     }
-        // }
 
         startTime = System.nanoTime();
         currentFrame = new BufferedImage(img.getWidth(), img.getHeight(), BufferedImage.TYPE_INT_ARGB);
@@ -125,9 +114,7 @@ public class QuadTreeCompression {
         g.setColor(new Color(averageColor(img, 0, 0, img.getWidth(), img.getHeight())));
         g.fillRect(0, 0, img.getWidth(), img.getHeight());
         g.dispose();
-        //frames.add(copyOf(currentFrame));
 
-        //QuadTreeNode root = buildQuadTree(img, 0, 0, img.getWidth(), img.getHeight(), 0);
         QuadTreeNode root = buildQuadTreeBFS(img);
         saveGif(gifPath, frames, 500); // delay per frame: 200ms
         long executionTime = System.nanoTime() - startTime;
@@ -278,6 +265,22 @@ public class QuadTreeCompression {
                     Collections.addAll(newChildren, children);
                 }
             }
+            if (!newChildren.isEmpty()) {
+                Graphics2D g = currentFrame.createGraphics();
+                // gambar semua leaf
+                for (QuadTreeNode leaf : currentLeaves) {
+                    g.setColor(new Color(leaf.color));
+                    g.fillRect(leaf.x, leaf.y, leaf.width, leaf.height);
+                }
+                // gambar semua children baru
+                for (QuadTreeNode child : newChildren) {
+                    g.setColor(new Color(child.color));
+                    g.fillRect(child.x, child.y, child.width, child.height);
+                }
+                g.dispose();
+                frames.add(copyOf(currentFrame));
+                queue.addAll(newChildren);
+            }
         }
         return root;
     }
@@ -288,7 +291,6 @@ public class QuadTreeCompression {
         int i = 1;
         for (BufferedImage frame : frames) {
             writer.writeToSequence(frame);
-            //ImageIO.write(frame, "png", new File("frame_" + i + ".png"));
             i++;
         }
         writer.close();
@@ -314,9 +316,10 @@ public class QuadTreeCompression {
         double high = 10;
         double bestCompressionDiff = Double.MAX_VALUE;
         double achievedCompression =0;
+        double achievedBefore = 0;
         int iteration = 0;
 
-        // System.out.println("Target Compression: " + targetCompression);
+        System.out.println("Target Compression: " + targetCompression);
     
         // Step 1: Perluas high jika kompresi masih negatif
         while (true) {
@@ -325,8 +328,9 @@ public class QuadTreeCompression {
             achievedCompression = 1.0 - ((double) compressed / originalSize);
             // System.out.printf("[EXTEND-HIGH] Threshold=%.2f | Compressed=%d | Achieved=%.4f\n", high, compressed, achievedCompression);
     
-            if (achievedCompression >= targetCompression) break;
+            if ((achievedCompression >= targetCompression)||(achievedBefore == achievedCompression)) break;
             high += 500;
+            achievedBefore = achievedCompression;
         }
         double bestThreshold = high;
         double highest = high;
@@ -383,9 +387,6 @@ public class QuadTreeCompression {
         long rSum = 0, gSum = 0, bSum = 0;
         int count = 0;
 
-        // if (width * height > minBlockSize){
-        //     return 0;
-        // }
         // Hitung rata-rata tiap kanal warna
         for (int i = x; i < x + width; i++) {
             for (int j = y; j < y + height; j++) {
