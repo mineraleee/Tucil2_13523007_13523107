@@ -118,7 +118,7 @@ public class QuadTreeCompression {
         printRow("Target Kompresi", String.valueOf(targetCompression), ANSI_BLUE);
 
         if (targetCompression == 0){
-            isMinBlock = false;
+            isMinBlock = true;
             System.out.print("Masukkan threshold: ");
             threshold = scanner.nextDouble();
             printRow("Threshold", String.valueOf(threshold), ANSI_BLUE);
@@ -127,7 +127,7 @@ public class QuadTreeCompression {
             minBlockSize = scanner.nextInt();
             printRow("Blok Minimum", String.valueOf(minBlockSize), ANSI_BLUE);
         } else{
-            isMinBlock = true;
+            isMinBlock = false;
             long thresholdStart = System.nanoTime();
             threshold = findBestThreshold (img, originalSize);
             thresholdTime = System.nanoTime() - thresholdStart;
