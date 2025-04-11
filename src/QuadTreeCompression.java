@@ -286,7 +286,6 @@ public class QuadTreeCompression {
     
                 if (err < thresholdVal) {
                     node.isLeaf = true;
-                    totalNodes++;
                     currentLeaves.add(node);
     
                 } else {
